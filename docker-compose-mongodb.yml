@@ -1,0 +1,67 @@
+services:
+  kafka:
+    image: quay.io/debezium/kafka:3.5
+    container_name: kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      CLUSTER_ID: hiepnh
+      NODE_ID: 1
+      NODE_ROLE: combined
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+    networks:
+      - debezium-net
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    hostname: mongodb
+    ports:
+      - "27017:27017"
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    healthcheck:
+      test: |
+        echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}) }" | mongosh --quiet
+      interval: 10s
+      timeout: 30s
+      retries: 10
+      start_period: 10s
+    environment:
+      MONGO_INITDB_DATABASE: inventory
+    networks:
+      - debezium-net
+
+  connect:
+    image: quay.io/debezium/connect:3.5
+    container_name: connect
+    hostname: connect
+    ports:
+      - "8083:8083"
+    environment:
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: my_connect_configs
+      OFFSET_STORAGE_TOPIC: my_connect_offsets
+      STATUS_STORAGE_TOPIC: my_connect_statuses
+      BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      - kafka
+      - mongodb
+    networks:
+      - debezium-net
+
+  watcher:
+    image: quay.io/debezium/kafka:3.5
+    container_name: watcher
+    hostname: watcher
+    command: ["watch-topic", "-a", "-k", "fulfillment.inventory.customers"]
+    depends_on:
+      - kafka
+    networks:
+      - debezium-net
+
+networks:
+  debezium-net:
+    driver: bridge

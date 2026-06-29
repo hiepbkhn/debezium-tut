@@ -1,8 +1,10 @@
 # Debezium Tutorial
 
-CDC streaming with Debezium, Kafka, and MySQL.
+CDC streaming with Debezium, Kafka, and MySQL (or MongoDB).
 
-## Services
+## MySQL
+
+### Services
 
 | Service | Image | Port |
 |---------|-------|------|
@@ -11,13 +13,13 @@ CDC streaming with Debezium, Kafka, and MySQL.
 | Connect | `quay.io/debezium/connect:3.5` | 8083 |
 | Watcher | `quay.io/debezium/kafka:3.5` | — |
 
-## Quick Start
+### Quick Start
 
 ```bash
-docker compose up -d
+docker compose -f docker-compose-mysql.yml up -d
 ```
 
-Register the connector:
+Register the MySQL connector:
 
 ```bash
 curl -i -X POST http://localhost:8083/connectors \
@@ -43,5 +45,53 @@ curl -i -X POST http://localhost:8083/connectors \
 Watch the CDC events:
 
 ```bash
-docker compose up watcher
+docker compose -f docker-compose-mysql.yml up watcher
+```
+
+---
+
+## MongoDB
+
+### Services
+
+| Service | Image | Port |
+|---------|-------|------|
+| Kafka | `quay.io/debezium/kafka:3.5` | 9092 |
+| MongoDB | `mongo:7` (replica set `rs0`) | 27017 |
+| Connect | `quay.io/debezium/connect:3.5` | 8083 |
+| Watcher | `quay.io/debezium/kafka:3.5` | — |
+
+### Quick Start
+
+```bash
+docker compose -f docker-compose-mongodb.yml up -d
+```
+
+Wait for MongoDB replica set to initialize (healthcheck auto-runs `rs.initiate()`), then register the connector:
+
+```bash
+curl -i -X POST http://localhost:8083/connectors \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "inventory-connector",
+    "config": {
+      "connector.class": "io.debezium.connector.mongodb.MongoDbConnector",
+      "mongodb.connection.string": "mongodb://mongodb:27017/?replicaSet=rs0",
+      "topic.prefix": "fulfillment",
+      "collection.include.list": "inventory[.]*"
+    }
+  }'
+```
+
+Insert test data:
+
+```bash
+docker exec -it mongodb mongosh inventory \
+  --eval 'db.customers.insertOne({"_id": "1001", "first_name": "Alice", "last_name": "Johnson", "email": "alice@example.com"})'
+```
+
+Watch the CDC events:
+
+```bash
+docker compose -f docker-compose-mongodb.yml up watcher
 ```
