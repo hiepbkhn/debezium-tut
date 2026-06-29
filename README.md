@@ -1,6 +1,6 @@
 # Debezium Tutorial
 
-CDC streaming with Debezium, Kafka, and MySQL (or MongoDB).
+CDC streaming with Debezium, Kafka, and MySQL, MongoDB, or PostgreSQL.
 
 ## MySQL
 
@@ -94,4 +94,57 @@ Watch the CDC events:
 
 ```bash
 docker compose -f docker-compose-mongodb.yml up watcher
+```
+
+---
+
+## PostgreSQL
+
+### Services
+
+| Service | Image | Port |
+|---------|-------|------|
+| Kafka | `quay.io/debezium/kafka:3.5` | 9092 |
+| PostgreSQL | `quay.io/debezium/example-postgres:3.5` | 5432 |
+| Connect | `quay.io/debezium/connect:3.5` | 8083 |
+| Watcher | `quay.io/debezium/kafka:3.5` | — |
+
+### Quick Start
+
+```bash
+docker compose -f docker-compose-postgresql.yml up -d
+```
+
+Register the PostgreSQL connector:
+
+```bash
+curl -i -X POST http://localhost:8083/connectors \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "inventory-connector",
+    "config": {
+      "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+      "database.hostname": "postgres",
+      "database.port": "5432",
+      "database.user": "postgres",
+      "database.password": "postgres",
+      "database.dbname": "inventory",
+      "topic.prefix": "fulfillment",
+      "table.include.list": "public.inventory",
+      "plugin.name": "pgoutput"
+    }
+  }'
+```
+
+Insert test data:
+
+```bash
+docker exec -it postgres psql -U postgres -d inventory \
+  -c "INSERT INTO customers (id, first_name, last_name, email) VALUES (1001, 'Alice', 'Johnson', 'alice@example.com');"
+```
+
+Watch the CDC events:
+
+```bash
+docker compose -f docker-compose-postgresql.yml up watcher
 ```
