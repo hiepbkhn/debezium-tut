@@ -1,3 +1,6 @@
+source: https://debezium.io/documentation/reference/3.5/tutorial.html
+
+----------------------
 docker run -it --rm -p 9092:9092 \
   --name kafka --hostname kafka \
   -e CLUSTER_ID=hiepnh \
